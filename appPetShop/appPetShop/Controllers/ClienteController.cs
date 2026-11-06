@@ -1,0 +1,181 @@
+﻿using System.Text;
+using System.Security.Cryptography;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using appPetShop.Models;
+
+namespace appPetShop.Controllers
+{
+    public class ClienteController : Controller
+    {
+        private readonly DbPetShopContext _context;
+
+        public ClienteController(DbPetShopContext context)
+        {
+            _context = context;
+        }
+
+        // GET: Cliente
+        public async Task<IActionResult> Index()
+        {
+            return View(await _context.Clientes.ToListAsync());
+        }
+
+        // GET: Cliente/Details/5
+        public async Task<IActionResult> Details(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var cliente = await _context.Clientes
+                .FirstOrDefaultAsync(m => m.Codigo == id);
+            if (cliente == null)
+            {
+                return NotFound();
+            }
+
+            return View(cliente);
+        }
+
+        // GET: Cliente/Create
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        // POST: Cliente/Create
+        // To protect from overposting attacks, enable the specific properties you want to bind to.
+        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create([Bind("Codigo,Nome,Cpf,Telefone,DataNascimento")] Cliente cliente)
+        {
+            if (ModelState.IsValid)
+            {
+                cliente.Cpf = GerarHashCpf(cliente.Cpf);
+
+                _context.Add(cliente);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            return View(cliente);
+        }
+
+        // GET: Cliente/Edit/5
+        public async Task<IActionResult> Edit(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var cliente = await _context.Clientes.FindAsync(id);
+            if (cliente == null)
+            {
+                return NotFound();
+            }
+            return View(cliente);
+        }
+
+        // POST: Cliente/Edit/5
+        // To protect from overposting attacks, enable the specific properties you want to bind to.
+        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, [Bind("Codigo,Nome,Cpf,Telefone,DataNascimento")] Cliente cliente)
+        {
+            if (id != cliente.Codigo)
+            {
+                return NotFound();
+            }
+
+            if (ModelState.IsValid)
+            {
+                try
+                {
+                    // 🔒 Garante que o novo CPF editado também seja convertido em Hash
+                    cliente.Cpf = GerarHashCpf(cliente.Cpf);
+
+                    _context.Update(cliente);
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!ClienteExists(cliente.Codigo))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+                return RedirectToAction(nameof(Index));
+            }
+            return View(cliente);
+        }
+
+        // GET: Cliente/Delete/5
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var cliente = await _context.Clientes
+                .FirstOrDefaultAsync(m => m.Codigo == id);
+            if (cliente == null)
+            {
+                return NotFound();
+            }
+
+            return View(cliente);
+        }
+
+        // POST: Cliente/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            var cliente = await _context.Clientes.FindAsync(id);
+            if (cliente != null)
+            {
+                _context.Clientes.Remove(cliente);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+        private bool ClienteExists(int id)
+        {
+            return _context.Clientes.Any(e => e.Codigo == id);
+        }
+        private string GerarHashCpf(string cpf)
+        {
+            if (string.IsNullOrWhiteSpace(cpf))
+                return string.Empty;
+
+            // 1. Remove caracteres não numéricos (pontos, traços, espaços)
+            string cpfLimpo = string.Concat(Array.FindAll(cpf.ToCharArray(), char.IsDigit));
+
+            // 2. Converte para bytes UTF-8
+            byte[] inputBytes = Encoding.UTF8.GetBytes(cpfLimpo);
+
+            // 3. Gera o Hash SHA-256
+            byte[] hashBytes = SHA256.HashData(inputBytes);
+
+            // 4. Retorna em formato Hexadecimal (64 caracteres)            
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+
+    }
+}
